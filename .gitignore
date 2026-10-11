@@ -1,0 +1,7 @@
+venv/
+HMDB51/
+*.zip
+*.npy
+*.pt
+__pycache__/
+.ipynb_checkpoints/
