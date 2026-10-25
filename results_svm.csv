@@ -1,5 +1,0 @@
-model,params,cv_bal_acc,test_acc,test_bal_acc,test_f1_macro
-Dummy (majority),{},0.5,0.575,0.5,0.365
-LogReg,{'clf__C': 0.01},0.695,0.875,0.868,0.871
-SVM linear,{'clf__C': 0.001},0.714,0.875,0.868,0.871
-SVM rbf,"{'clf__C': 1, 'clf__gamma': 0.0001}",0.703,0.788,0.792,0.786
