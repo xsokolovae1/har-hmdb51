@@ -1,5 +1,6 @@
 venv/
 HMDB51/
+charades/
 *.zip
 *.npy
 *.pt
