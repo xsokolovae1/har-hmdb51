@@ -16,7 +16,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-CLASSES = ["eat", "drink"]  # index triedy = label (0 = eat, 1 = drink)
+CLASSES = ["eat", "clap"]  # index triedy = label (0 = eat, 1 = drink)
 N_FRAMES = 16               # počet snímok na klip
 SIZE = 224                  # veľkosť snímky (vstup ResNet18)
 
@@ -100,23 +100,44 @@ def svm_search(X, y, groups):
     return gs
 
 
+def split_metrics(seed, y_true, y_pred, datasets):
+    """Metriky jedného delenia: zvlášť pre každý dataset v teste (a spolu, ak sú dva).
+
+    Riadky majú stĺpec `test_set` (napr. 'hmdb', 'charades', 'all').
+    """
+    names = sorted(set(datasets))
+    sets = names if len(names) == 1 else ["all", *names]
+    rows = []
+    for name in sets:
+        m = np.ones(len(y_true), bool) if name == "all" else (datasets == name)
+        rows.append({"split": seed, "test_set": name, **metrics(y_true[m], y_pred[m])})
+    return rows
+
+
 def evaluate_svm(X, df, n_splits=10):
     """Vyhodnotí SVM na opakovaných deleniach.
 
-    Vracia tabuľku metrík pre každé delenie a súčet predikcií (pre confusion matrix).
+    Vracia tabuľku metrík (riadok = delenie × testovací dataset)
+    a všetky testovacie predikcie spolu (pre confusion matrix).
     """
-    y, groups = df.label.values, df.source.values
+    y, groups, ds = df.label.values, df.source.values, df.dataset.values
     rows, y_all, p_all = [], [], []
     for seed, tr, te in make_splits(df, n_splits):
         gs = svm_search(X[tr], y[tr], groups[tr])
         pred = gs.predict(X[te])
-        rows.append({"split": seed, **metrics(y[te], pred), "params": gs.best_params_})
+        for r in split_metrics(seed, y[te], pred, ds[te]):
+            rows.append({**r, "params": str(gs.best_params_)})
         y_all.append(y[te])
         p_all.append(pred)
     return pd.DataFrame(rows), np.concatenate(y_all), np.concatenate(p_all)
 
 
 def summarize(results, name):
-    """Priemer ± smerodajná odchýlka cez delenia -> jeden riadok tabuľky."""
-    m = results[["acc", "bal_acc", "f1"]]
-    return pd.Series({c: f"{m[c].mean():.3f} ± {m[c].std():.3f}" for c in m}, name=name)
+    """Priemer ± smerodajná odchýlka cez delenia, zvlášť pre každý testovací dataset."""
+    out = {}
+    for test_set, g in results.groupby("test_set", sort=False):
+        out[(name, test_set)] = {c: f"{g[c].mean():.3f} ± {g[c].std():.3f}"
+                                 for c in ["acc", "bal_acc", "f1"]}
+    table = pd.DataFrame(out).T
+    table.index.names = ["model", "test_set"]
+    return table
